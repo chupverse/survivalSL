@@ -1,8 +1,8 @@
 
-# survivalSL: Super Learner for survival data <a href='https://cran.r-project.org/web/packages/survivalSL/index.html'><img src='man/logoSL.png' align="right" height="139" /></a>
+# survivalSL: an R package for predciting survival with Super Learner 
 
 
-## Description
+## Description <a href='https://cran.r-project.org/web/packages/survivalSL/index.html'><img src='man/logoSL.png' align="right" height="210" /></a>
 
 The R package ‘survivalSL’ contains a variety of functions to construct
 a super learner in the presence of censored times-to-event and to
