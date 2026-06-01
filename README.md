@@ -1,5 +1,6 @@
-survivalSL: an R Package for Predicting Survival by a Super Learner
-================
+
+# survivalSL: Super Learner for survival data <a href='https://stringr.tidyverse.org'><img src='man/figures/logo.png' align="right" height="139" /></a>
+
 
 ## Description
 
