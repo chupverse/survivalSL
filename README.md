@@ -1,5 +1,5 @@
 
-# survivalSL: Super Learner for survival data <a href='https://stringr.tidyverse.org'><img src='man/figures/logo.png' align="right" height="139" /></a>
+# survivalSL: Super Learner for survival data <a href='https://cran.r-project.org/web/packages/survivalSL/index.html'><img src='man/logoSL.png' align="right" height="139" /></a>
 
 
 ## Description
