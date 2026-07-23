@@ -56,15 +56,81 @@ tuneCOXen<- function(formula, data, penalty = NULL, cv = 10, parallel =
   .y <- Surv(data[[times]], data[[failures]])
   .x <- model.matrix(formula,data)[,-1]
   .results<-c()
-  
+
   if(!(is.null(penalty))){
-    
+
     if(length(penalty)!=length(variables_formula[-c(1,2)]))stop("Penalty length does not equal the number of variables.")
     if(!all(unique(penalty) %in% c(0,1)))stop("Penalty must be numeric and have only 0 or 1.")}
-  
 
+
+  # --- Function to create stratified folds ---
+  create_stratified_folds <- function(status, K = 5, seed = 123){
+    set.seed(seed)
+
+    folds <- rep(NA, length(status))
+
+    event_idx  <- which(status == 1)
+    censor_idx <- which(status == 0)
+
+    event_idx  <- sample(event_idx)
+    censor_idx <- sample(censor_idx)
+
+    folds[event_idx]  <- rep(1:K, length.out = length(event_idx))
+    folds[censor_idx] <- rep(1:K, length.out = length(censor_idx))
+
+    return(folds)
+  }
+
+  # --- Create stratified folds ---
   set.seed(seed)
-  foldid <- sample(rep(seq(cv), length.out = nrow(.x)))
+  data$id <- 1:nrow(data)
+  data$folds <- create_stratified_folds(status = data[[failures]], K = cv, seed = seed)
+
+  # --- Check factor variables to ensure all levels appear in training ---
+  if(any(sapply(data, is.factor))){
+    factor_vars <- names(data)[sapply(data, is.factor)]
+
+    inside <- function(factor, train, valid){
+      all(unique(valid[, factor]) %in% unique(train[, factor]))
+    }
+
+    check_CVtune <- function(factors, CV){
+      result <- unlist(lapply(factors, inside, train = CV$train, valid = CV$valid))
+      all(result)
+    }
+
+    i <- 0
+    success <- FALSE
+    while(!success){
+      i <- i + 1
+      seed <- sample(1:1000, 1)
+      set.seed(seed)
+
+      data$folds <- create_stratified_folds(status = data[[failures]], K = cv, seed = seed)
+      data$id <- 1:nrow(data)
+
+      CVtune <- lapply(1:cv, function(k){
+        train <- data[data$folds != k, ]
+        valid <- data[data$folds == k, ]
+        t_max_fold <- max(train[train[[failures]] == 1, times])
+        list(train = train, valid = valid, t_max_fold = t_max_fold)
+      })
+
+      success <- check_CVtune(factor_vars, CVtune)
+
+      if(!success){
+        warning(paste("Seed was changed to", seed,
+                      "because some factor levels were missing in training folds."))
+      }
+
+      if(i >= 3 & !success){
+        stop("Some levels of factor variables in the validation set are missing from the training set.")
+      }
+    }
+  }
+
+  # --- Prepare foldid for cv.glmnet ---
+  foldid <- data$folds
 
   if(!(is.null(penalty))) {
     for( a in 1:length(alpha)){
@@ -76,9 +142,7 @@ tuneCOXen<- function(formula, data, penalty = NULL, cv = 10, parallel =
                       cbind(rep(alpha[a],length(.cv.en$lambda)),.cv.en$lambda,.cv.en$cvm))
 
     }
-  }
-
-  else{
+  }else{
     for(a in 1:length(alpha)){
       .cv.en<-glmnet::cv.glmnet(x=.x, y=.y, family = "cox",  type.measure = "deviance", foldid=foldid,
                                 foldsid="folds", parallel = parallel, alpha=alpha[a],

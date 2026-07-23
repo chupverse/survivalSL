@@ -1,8 +1,9 @@
 \name{summary.sltime}
 \alias{summary.sltime}
+\alias{print.summary.sltime}
 
 \title{
-Summaries of a Super Learner
+S3 method for Summarizing a Super Learner
 }
 \description{
 Return goodness-of-fit indicators of a Super Learner obtained by the function \code{survivalSL}.
@@ -29,10 +30,11 @@ The following metrics can be used : "bs" for the Brier score at the prognostic t
 }
 
 \value{
-\item{metrics}{A data frame containing the computed predictive performance metrics.}
-\item{library}{The name of the library used for model training.}
+\item{library}{The name of the library for which to test the performance}
 \item{pro.time}{The prognostic time used for evaluation.}
 \item{ROC.precision}{The precision values used for the ROC curve computation.}
+\item{metrics}{A data frame containing the computed predictive performance metrics.}
+
 }
 
 \seealso{

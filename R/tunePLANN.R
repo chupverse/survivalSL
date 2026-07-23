@@ -71,36 +71,47 @@ tunePLANN <- function(formula, data, cv=10, inter=1, size=c(2, 4, 6, 8, 10), dec
 
 
   if(metric=="ll"){
-    haz_function<-function(surv,times){
-      x<-1
-      result<-sapply(2:length(surv),function(i){
-        value<-surv[i]
-        if(value!=surv[i-1]){
-          x<<- x+1
+    haz_function <- function(surv, times) {
+      x <- 1
+      result <- sapply(2:length(surv), function(i) {
+        value <- surv[i]
+        if(value != surv[i-1]) {
+          x <<- x + 1
         }
         return(x)
       })
 
-
-      df<-data.frame(temps=times,value=-log(surv),result=c(1,result))
+      df <- data.frame(temps = times, value = -log(surv), result = c(1, result))
       df_unique <- df[!duplicated(df$result), ]
-      if(nrow(df_unique)>1){
-        diff_1<-diff(df_unique$temps)
-        diff_2 <- diff(df_unique$value)
-        resultat <- diff_2/diff_1
-        resultat<-c(Inf,resultat,NA)
-        idx=findInterval(times,c(0,df_unique$temps))
-        bj<-c(Inf,resultat[idx])
-      }
-      else{
-        bj<-c(rep(Inf,(length(surv)-1)),NA)
-      }
 
+      if(nrow(df_unique) > 1) {
+        # Calculation of hazard rates for each interval
+        diff_1 <- diff(df_unique$temps)
+        diff_2 <- diff(df_unique$value)
+        taux_intervalles <- diff_2 / diff_1
+
+        # Creating a result vector of the correct length
+        bj <- rep(NA, length(times))
+
+        # For each time EXCEPT THE LAST, assign the corresponding rate
+        for(i in 1:(length(times)-1)) {
+          idx_interval <- findInterval(times[i], df_unique$temps)
+
+          # Ensure that the index is valid
+          if(idx_interval > 0 && idx_interval <= length(taux_intervalles)) {
+            bj[i] <- taux_intervalles[idx_interval]
+          }
+        }
+
+        # The last time remains NA (already done by the initialization)
+
+      } else {
+        # No changes: NA everywhere
+        bj <-  rep(NA, length(times))
+      }
 
       return(bj)
-
     }
-
 
   }
 
@@ -113,63 +124,117 @@ tunePLANN <- function(formula, data, cv=10, inter=1, size=c(2, 4, 6, 8, 10), dec
   .data_bis<-data
   .time <-unique(sort(c(0,pro.time,data[[times]])))
 
+
+
+
+
+  create_stratified_folds <- function(status, K = 5, seed=123){
+
+    set.seed(seed)
+
+    folds <- rep(NA, length(status))
+
+    event_idx  <- which(status == 1)
+    censor_idx <- which(status == 0)
+
+    event_idx  <- sample(event_idx)
+    censor_idx <- sample(censor_idx)
+
+    folds[event_idx]  <- rep(1:K, length.out = length(event_idx))
+    folds[censor_idx] <- rep(1:K, length.out = length(censor_idx))
+
+    return(folds)
+  }
+
+  set.seed(seed)
+  data$id = 1:nrow(data)
+
+  data$folds <- create_stratified_folds(data[[failures]], K = cv, seed=seed)
+
+  CVtune <- lapply(1:cv, function(i) {
+
+    # create train and valid
+    train <- data[data$folds != i, ]
+    valid <- data[data$folds == i, ]
+
+    # calculate t_max_fold
+    t_max_fold <- max(train[train[[failures]] == 1, times])
+
+    list(
+      train = train,
+      valid = valid,
+      t_max_fold = t_max_fold
+    )
+  })
+
+
+
+  if(any(sapply(data, is.factor))){
+
+    factor_vars <- names(data)[sapply(data, is.factor)]
+
+    # Function to check that all factor levels in validation exist in training
+    inside <- function(factor, train, valid){
+      all(unique(valid[,factor]) %in% unique(train[,factor]))
+    }
+
+    # Function to check all factor variables for one CV split
+    check_CVtune <- function(factors, CV){
+      result <- unlist(lapply(factors, inside, train = CV$train, valid = CV$valid))
+      all(result)
+    }
+
+    i <- 0
+    success <- FALSE
+
+    while(!success){
+      i <- i + 1
+
+      # Generate a random seed for reproducibility
+      seed <- sample(1:1000, 1)
+
+      # Create stratified folds based on event status
+      data$folds <- create_stratified_folds(status = data[[failures]], K = cv, seed = seed)
+      data$id <- 1:nrow(data)
+
+      # Build CVtune list
+      CVtune <- lapply(1:cv, function(k){
+        train <- data[data$folds != k, ]
+        valid <- data[data$folds == k, ]
+        t_max_fold <- max(train[train[[failures]] == 1, times])
+        list(
+          train = train,
+          valid = valid,
+          t_max_fold = t_max_fold
+        )
+      })
+
+      # Check that all factor levels are present in training
+      success <- check_CVtune(factor_vars, CVtune)
+
+      if(!success){
+        warning(paste("The seed has been changed to", seed,
+                      "because some factor levels are missing in training folds."))
+      }
+
+      # Stop if after 3 attempts it still fails
+      if(i >= 3 & !success){
+        stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please check your dataset.")
+      }
+    }
+
+  }
+
+
+  t_max_global <- min(unlist(lapply(CVtune,function(x)(return(x$t_max_fold)))))
+  .time <- .time[.time <= t_max_global]
+
+
   if (is.null(maxtime) || maxtime < max(.time)) {
     maxtime <- max(.time) + 1
   }
 
 
-
-  set.seed(seed)
-  sample_id <- sample(nrow(data))
-  folds <- cut(seq(1,nrow(data)), breaks=cv, labels=FALSE)
-  folds_id <- folds[sample_id]
-  data$folds <- folds_id
-  data$id<-1:nrow(data)
-
-  CVtune <- lapply(1:cv, function(i) {
-    list(
-      train = data[data$folds != i, ],
-      valid = data[data$folds == i, ]
-    )})
-
-
-
-  if(any(sapply(data,is.factor))){
-    factor_vars<-names(data)[sapply(data,is.factor)]
-    inside<-function(factor,train,valid){
-      result<-all(unique(valid[,factor]) %in% unique(train[,factor]))
-      return(result)
-    }
-    check_CVtune<-function(factors,CV){
-      result<-unlist(lapply(factors,inside,train=CV$train,valid=CV$valid))
-      return(all(result))
-    }
-
-    i<-0
-
-    while(check_CVtune(factor_vars,CVtune)==FALSE){
-      i<-i+1
-      seed<-sample(1:1000,1)
-      warning("The seed has been changed.")
-      set.seed(seed)
-      sample_id <- sample(nrow(data))
-      folds <- cut(seq(1,nrow(data)), breaks=cv, labels=FALSE)
-      folds_id <- folds[sample_id]
-      data$folds <- folds_id
-      data$id<-1:nrow(data)
-
-      CVtune <- lapply(1:cv, function(i) {
-        list(
-          train = data[data$folds != i, ],
-          valid = data[data$folds == i, ]
-        )})
-
-      if(i>=3 & check_CVtune(factor_vars,CVtune)==FALSE)stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please change the seed.")
-
-    }
-
-
-  }
 
 
 
@@ -192,7 +257,11 @@ tunePLANN <- function(formula, data, cv=10, inter=1, size=c(2, 4, 6, 8, 10), dec
 
     .plann <- sPLANN(formula=.formula, data=cbind(data_bis,model_matrix), inter=y$inter, size = y$size, decay = y$decay,  maxit = y$maxit, MaxNWts = y$MaxNWts, pro.time=maxtime)
 
-    newdata <- model.matrix(formula, rbind(x$valid,x$train))[1:nrow(x$valid),]
+    newdata <- model.matrix(.formula, rbind(x$valid, x$train))[
+      1:nrow(x$valid),
+      ,
+      drop = FALSE
+    ]
     .survivals <- predict(.plann, newdata = data.frame(newdata), newtimes = .time)$predictions
     return(predictions=list(survivals=.survivals, id=x$valid$id))
 
@@ -219,7 +288,7 @@ tunePLANN <- function(formula, data, cv=10, inter=1, size=c(2, 4, 6, 8, 10), dec
     survivals.matrix<-x$survivals
     hazards.matrix<-NULL
     if(metric=="ll"){
-      hazards.matrix<-t(apply(x$survivals[,-1],1,haz_function,times=.time))
+      hazards.matrix<-t(apply(x$survivals,1,haz_function,times=.time))
     }
     resultat<-metrics(metric=metric,formula=formula,data=data,survivals.matrix=survivals.matrix,hazards.matrix=hazards.matrix,prediction.times=.time,pro.time=pro.time,ROC.precision=ROC.precision)
     return(resultat)

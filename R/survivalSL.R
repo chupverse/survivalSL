@@ -11,17 +11,22 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
   if (missing(formula)) stop("The 'formula' argument is required.")
 
 
+
+
+
   if(show_progress){
-    total<-3*length(unique(methods))+cv+1
+    M <- length(methods)
+    total <- M + (M * cv) + M + 3
+    pb <- txtProgressBar(min = 0, max = total, style = 3)
+    progress <- 0
 
-    pb<-txtProgressBar(min=0,max=total,style=3)
-    progress<-0
-
-    update_progress<-function(){
-      progress<<-progress+1
-      setTxtProgressBar(pb,progress)
+    update_progress <- function(){
+      progress <<- progress + 1
+      setTxtProgressBar(pb, progress)
+      if(progress == total) close(pb)
     }
   }
+
 
 
   if(!(optim.method %in% c("SANN","Nelder-Mead")))stop("You can either choose the SANN or Nelder-Mead methods.")
@@ -34,42 +39,50 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
 
 
   if(metric=="ll"){
-    haz_function<-function(surv,times){
-      x<-1
-      result<-sapply(2:length(surv),function(i){
-        value<-surv[i]
-        if(value!=surv[i-1]){
-          x<<- x+1
+    haz_function <- function(surv, times) {
+      x <- 1
+      result <- sapply(2:length(surv), function(i) {
+        value <- surv[i]
+        if(value != surv[i-1]) {
+          x <<- x + 1
         }
         return(x)
       })
 
-
-      df<-data.frame(temps=times,value=-log(surv),result=c(1,result))
+      df <- data.frame(temps = times, value = -log(surv), result = c(1, result))
       df_unique <- df[!duplicated(df$result), ]
-      if(nrow(df_unique)>1){
-        diff_1<-diff(df_unique$temps)
-        diff_2 <- diff(df_unique$value)
-        resultat <- diff_2/diff_1
-        resultat<-c(Inf,resultat,NA)
-        idx=findInterval(times,c(0,df_unique$temps))
-        bj<-c(Inf,resultat[idx])
-      }
-      else{
-        bj<-c(rep(Inf,(length(surv)-1)),NA)
-      }
 
+      if(nrow(df_unique) > 1) {
+        # Calculation of hazard rates for each interval
+        diff_1 <- diff(df_unique$temps)
+        diff_2 <- diff(df_unique$value)
+        taux_intervalles <- diff_2 / diff_1
+
+        # Creating a result vector of the correct length
+        bj <- rep(NA, length(times))
+
+        # For each time EXCEPT THE LAST, assign the corresponding rate
+        for(i in 1:(length(times)-1)) {
+          idx_interval <- findInterval(times[i], df_unique$temps)
+
+          # Ensure that the index is valid
+          if(idx_interval > 0 && idx_interval <= length(taux_intervalles)) {
+            bj[i] <- taux_intervalles[idx_interval]
+          }
+        }
+
+        # The last time remains NA (already done by the initialization)
+
+      } else {
+        # No changes: NA everywhere
+        bj <-  rep(NA, length(times))
+      }
 
       return(bj)
-
     }
 
-
   }
-  
-  
- 
-  
+
 
   variables_formula <- all.vars(formula)
 
@@ -106,13 +119,13 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
     data<-cbind(subset_data, data[!colnames(data) %in% colnames(subset_data), drop = FALSE])
     warning("Data need to be without NA. NA is removed")
   }
-  
-  
+
+
   if(!(is.null(penalty))){
-    
+
     if(length(penalty)!=length(variables_formula[-c(1,2)]))stop("Penalty length does not equal the number of variables.")
     if(!all(unique(penalty) %in% c(0,1)))stop("Penalty must be numeric and have only 0 or 1.")}
-  
+
 
 
   #####################
@@ -578,6 +591,7 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
   }
 
   time.pred <- unique(sort(c(0,pro.time,data[[times]])))
+  time.pred_bis <- unique(sort(c(0,pro.time,data[[times]])))
 
   if("LIB_PLANN" %in% methods){
     maxtime=max(time.pred)+1
@@ -896,67 +910,129 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
   ########################
 
 
+  create_stratified_folds <- function(status, K = 5, seed=123){
 
-  set.seed(seed)
-  data$id=1:nrow(data)
-  data$folds<-sample(rep(1:cv, length.out = nrow(data)))
+    set.seed(seed)
 
+    folds <- rep(NA, length(status))
+
+    event_idx  <- which(status == 1)
+    censor_idx <- which(status == 0)
+
+    event_idx  <- sample(event_idx)
+    censor_idx <- sample(censor_idx)
+
+    folds[event_idx]  <- rep(1:K, length.out = length(event_idx))
+    folds[censor_idx] <- rep(1:K, length.out = length(censor_idx))
+
+    return(folds)
+  }
+
+  data$id = 1:nrow(data)
+
+  data$folds <- create_stratified_folds(data[[failures]], K = cv, seed=seed)
 
   CVtune <- lapply(1:cv, function(i) {
-    if(show_progress){ update_progress()}
+
+    # create train and valid
+    train <- data[data$folds != i, ]
+    valid <- data[data$folds == i, ]
+
+    # calculate t_max_fold
+    t_max_fold <- max(train[train[[failures]] == 1, times])
+
     list(
-      train = data[data$folds != i, ],
-      valid = data[data$folds == i, ],
+      train = train,
+      valid = valid,
+      t_max_fold = t_max_fold,
       id=data[data$folds == i, "id"]
-    )})
+    )
+  })
 
 
 
-  if(any(sapply(data,is.factor))){
-    factor_vars<-names(data)[sapply(data,is.factor)]
-    inside<-function(factor,train,valid){
-      result<-all(unique(valid[,factor]) %in% unique(train[,factor]))
-      return(result)
+  if(any(sapply(data, is.factor))){
+
+    factor_vars <- names(data)[sapply(data, is.factor)]
+
+    # Function to check that all factor levels in validation exist in training
+    inside <- function(factor, train, valid){
+      all(unique(valid[,factor]) %in% unique(train[,factor]))
     }
-    check_CVtune<-function(factors,CV){
-      result<-unlist(lapply(factors,inside,train=CV$train,valid=CV$valid))
-      return(all(result))
+
+    # Function to check all factor variables for one CV split
+    check_CVtune <- function(factors, CV){
+      result <- unlist(lapply(factors, inside, train = CV$train, valid = CV$valid))
+      all(result)
     }
 
-    i<-0
+    i <- 0
+    success <- FALSE
 
-    while(check_CVtune(factor_vars,CVtune)==FALSE){
-      i<-i+1
-      seed<-sample(1:1000,1)
-      warning("The seed has been changed.")
+    while(!success){
+      i <- i + 1
+
+      # Generate a random seed for reproducibility
+      seed <- sample(1:1000, 1)
       set.seed(seed)
-      data$id=1:nrow(data)
-      data$folds<-sample(rep(1:cv, length.out = nrow(data)))
 
-      CVtune <- lapply(1:cv, function(i) {
+      # Create stratified folds based on event status
+      data$folds <- create_stratified_folds(status = data[[failures]], K = cv, seed = seed)
+      data$id <- 1:nrow(data)
+
+      # Build CVtune list
+      CVtune <- lapply(1:cv, function(k){
+        train <- data[data$folds != k, ]
+        valid <- data[data$folds == k, ]
+        t_max_fold <- max(train[train[[failures]] == 1, times])
         list(
-          train = data[data$folds != i, ],
-          valid = data[data$folds == i, ],
-          id=data[data$folds == i, "id"]
-        )})
+          train = train,
+          valid = valid,
+          t_max_fold = t_max_fold,
+          id=data[data$folds == k, "id"]
+        )
+      })
 
+      # Check that all factor levels are present in training
+      success <- check_CVtune(factor_vars, CVtune)
 
-      if(i>=3 & check_CVtune(factor_vars,CVtune)==FALSE)stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please change the seed.")
+      if(!success){
+        warning(paste("The seed has been changed to", seed,
+                      "because some factor levels are missing in training folds."))
+      }
 
+      # Stop if after 3 attempts it still fails
+      if(i >= 3 & !success){
+        stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please check your dataset.")
+      }
     }
-
 
   }
 
 
 
-
   id_vect<- unlist(lapply(CVtune,function(x)(return(x$id))))
+  # Calculate the maximum EVENT times per fold
+  max_event_time_across_folds <- min(sapply(CVtune, function(fold) {
+    # Only take the lines where failures == 1 (event)
+    event_times <- fold$train[[times]][fold$train[[failures]] == 1]
+    if(length(event_times) > 0) {
+      return(max(event_times))
+    } else {
+      # If there is no event in this fold (rare case), take the maximum of all time
+      warning("Fold without events detected, using max time instead")
+      return(max(fold$train[[times]]))
+    }
+  }))
 
+
+  # Adapt time.pred with this terminal
+  time.pred <- time.pred[time.pred <= max_event_time_across_folds]
 
 
 
   CV_one_method<-function(meth, Tune, CV, penalty, formula, time.pred){
+    if(show_progress){ update_progress()}
     if(meth == "LIB_AFTweibull"){
       fit<-LIB_AFTweibull(formula=formula, data=CV$train)
       pred=predict(fit, newtimes=time.pred, newdata=CV$valid)$predictions
@@ -1047,7 +1123,6 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
   cv_all_meth<-list()
 
   for(i in 1:M){
-    if(show_progress){ update_progress()}
     Tune<-.tune.optimal[i]
     meth<-methods[i]
     survivals<-((cv_function(meth,Tune,penalty,formula,time.pred,CVtune))$survivals)[order(id_vect),]
@@ -1068,7 +1143,7 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
     survivals.matrix <- Reduce("+", weighted_matrices)
     hazards.matrix<-NULL
     if(metric=="ll"){
-      hazards.matrix<-t(apply(survivals.matrix[,-1],1,haz_function,times=time.pred[-1]))
+      hazards.matrix<-t(apply(survivals.matrix,1,haz_function,times=time.pred))
     }
     result<-metrics(metric=metric,formula=formula, data=.data_bis, survivals.matrix=survivals.matrix, hazards.matrix=hazards.matrix,prediction.times=time.pred,pro.time=pro.time, ROC.precision=ROC.precision)
     if(metric %in% c("uno_ci","p_ci","auc","ll")){result<-(-result)}
@@ -1081,6 +1156,7 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
 
   if(is.null(param.weights.fix)==TRUE){
     set.seed(seed)
+    if(show_progress){ update_progress()}
     estim<-optim(par=param.weights.init, fn=metric_weight_function, list_surv=cv_all_meth, metric=metric,
                  hessian=F,
                  method=optim.method,control=list(maxit=maxit))
@@ -1091,6 +1167,8 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
                    metric=metric, hessian=F,
                    method=optim.method, control=list(maxit=maxit))
     }
+
+    if(show_progress){ update_progress() }
 
   }
 
@@ -1119,7 +1197,7 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
 
   for(me in 1:M){
     if(show_progress){ update_progress()}
-    FitALL[[me]]<-predict(object= .model[[me]],newtimes=time.pred)$predictions
+    FitALL[[me]]<-predict(object= .model[[me]],newtimes=time.pred_bis)$predictions
   }
 
   weighted_matrices <- mapply(function(mat, weight) mat * weight, FitALL, w.sl, SIMPLIFY = FALSE)
@@ -1140,7 +1218,7 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
 
   data<-.data_bis
 
-  res<-list(times=time.pred,
+  res<-list(times=time.pred_bis,
             predictions=survivals,
             FitALL=FitALL,
             data=data,
@@ -1158,7 +1236,6 @@ survivalSL <- function(formula, data, methods, metric="auc", penalty=NULL,
 
   class(res) <- "sltime"
   if(show_progress){ update_progress()}
-  if(show_progress){close(pb)}
 
   return(res)
 }

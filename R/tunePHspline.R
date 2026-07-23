@@ -66,56 +66,101 @@ tunePHspline<- function(formula, data, cv = 10, metric = "auc",k=1:4, pro.time
 
 
 
+  create_stratified_folds <- function(status, K = 5, seed=123){
+
+    set.seed(seed)
+
+    folds <- rep(NA, length(status))
+
+    event_idx  <- which(status == 1)
+    censor_idx <- which(status == 0)
+
+    event_idx  <- sample(event_idx)
+    censor_idx <- sample(censor_idx)
+
+    folds[event_idx]  <- rep(1:K, length.out = length(event_idx))
+    folds[censor_idx] <- rep(1:K, length.out = length(censor_idx))
+
+    return(folds)
+  }
+
   set.seed(seed)
-  sample_id <- sample(nrow(data))
-  folds <- cut(seq(1,nrow(data)), breaks=cv, labels=FALSE)
-  folds_id <- folds[sample_id]
-  data$folds <- folds_id
-  data$id<-1:nrow(data)
+  data$id = 1:nrow(data)
+
+  data$folds <- create_stratified_folds(data[[failures]], K = cv, seed=seed)
 
   CVtune <- lapply(1:cv, function(i) {
+
+    # create train and valid
+    train <- data[data$folds != i, ]
+    valid <- data[data$folds == i, ]
+
+    # calculate t_max_fold
+    t_max_fold <- max(train[train[[failures]] == 1, times])
+
     list(
-      train = data[data$folds != i, ],
-      valid = data[data$folds == i, ]
-    )})
+      train = train,
+      valid = valid,
+      t_max_fold = t_max_fold
+    )
+  })
 
 
 
+  if(any(sapply(data, is.factor))){
 
-  if(any(sapply(data,is.factor))){
-    factor_vars<-names(data)[sapply(data,is.factor)]
-    inside<-function(factor,train,valid){
-      result<-all(unique(valid[,factor]) %in% unique(train[,factor]))
-      return(result)
+    factor_vars <- names(data)[sapply(data, is.factor)]
+
+    # Function to check that all factor levels in validation exist in training
+    inside <- function(factor, train, valid){
+      all(unique(valid[,factor]) %in% unique(train[,factor]))
     }
-    check_CVtune<-function(factors,CV){
-      result<-unlist(lapply(factors,inside,train=CV$train,valid=CV$valid))
-      return(all(result))
+
+    # Function to check all factor variables for one CV split
+    check_CVtune <- function(factors, CV){
+      result <- unlist(lapply(factors, inside, train = CV$train, valid = CV$valid))
+      all(result)
     }
 
-    i<-0
+    i <- 0
+    success <- FALSE
 
-    while(check_CVtune(factor_vars,CVtune)==FALSE){
-      i<-i+1
-      seed<-sample(1:1000,1)
-      warning("The seed has been changed.")
+    while(!success){
+      i <- i + 1
+
+      # Generate a random seed for reproducibility
+      seed <- sample(1:1000, 1)
       set.seed(seed)
-      sample_id <- sample(nrow(data))
-      folds <- cut(seq(1,nrow(data)), breaks=cv, labels=FALSE)
-      folds_id <- folds[sample_id]
-      data$folds <- folds_id
-      data$id<-1:nrow(data)
 
-      CVtune <- lapply(1:cv, function(i) {
+      # Create stratified folds based on event status
+      data$folds <- create_stratified_folds(status = data[[failures]], K = cv, seed = seed)
+      data$id <- 1:nrow(data)
+
+      # Build CVtune list
+      CVtune <- lapply(1:cv, function(k){
+        train <- data[data$folds != k, ]
+        valid <- data[data$folds == k, ]
+        t_max_fold <- max(train[train[[failures]] == 1, times])
         list(
-          train = data[data$folds != i, ],
-          valid = data[data$folds == i, ]
-        )})
+          train = train,
+          valid = valid,
+          t_max_fold = t_max_fold
+        )
+      })
 
-      if(i>=3 & check_CVtune(factor_vars,CVtune)==FALSE)stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please change the seed.")
+      # Check that all factor levels are present in training
+      success <- check_CVtune(factor_vars, CVtune)
 
+      if(!success){
+        warning(paste("The seed has been changed to", seed,
+                      "because some factor levels are missing in training folds."))
+      }
+
+      # Stop if after 3 attempts it still fails
+      if(i >= 3 & !success){
+        stop("Certain levels of some factor variables in the validation sample are not present in the training sample. Please check your dataset.")
+      }
     }
-
 
   }
 
@@ -185,13 +230,10 @@ tunePHspline<- function(formula, data, cv = 10, metric = "auc",k=1:4, pro.time
 
   metric_results<-unlist(lapply(result,metric_function))
 
-
   if(metric %in% c("bs","ibs","ribs","bll","ibll","ribll")){
-    .idx<-which.min(metric_results)
-  }
-
-  else{
-    .idx<-which.max(metric_results)
+    .idx <- which.min(metric_results)
+  } else {
+    .idx <- which.max(metric_results)
   }
 
   data<-.data_bis

@@ -3,8 +3,7 @@ import(survival)
 import(survivalPLANN)
 #import(RISCA)
 
-
-importFrom(stats, terms, pnorm, dnorm, qnorm, update,  binomial, lm, glm, na.omit, predict, quantile,
+importFrom(stats, terms, pnorm, dnorm, qnorm, update, binomial, lm, glm, na.omit, predict, quantile,
            sd, optim, pchisq, update.formula, coef, setNames, as.formula, model.matrix,
            median, formula)
 
@@ -54,17 +53,10 @@ export(tuneCOXridge)
 export(tuneCOXen)
 export(tuneRSF)
 export(tunePLANN)
-export(plot.libsl)
-export(plot.sltime)
-#export(roc)
+
 export(metrics)
-export(predict.libsl)
-export(predict.sltime)
-export(summary.libsl)
-export(summary.sltime)
 
-
-
+# Export des méthodes S3 (une seule syntaxe - recommandé: S3method)
 S3method(predict, libsl)
 S3method(predict, sltime)
 
@@ -74,11 +66,5 @@ S3method(summary, sltime)
 S3method(plot, libsl)
 S3method(plot, sltime)
 
-
-
 S3method(print, libsl)
 S3method(print, sltime)
-
-#S3method(plot, rocrisca)
-#S3method(lines, rocrisca)
-

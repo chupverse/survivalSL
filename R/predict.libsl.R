@@ -66,6 +66,9 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
       .times<-object$times
       .time<-newtimes
       .idx<-findInterval(.time,.times)
+
+      # Extrapolation no allowed
+      .idx[.time > max(.times)] <- NA
       .survivals<-.surv[,.idx]
 
 
@@ -133,11 +136,7 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
         newdata<-cbind(new,newdata)
       }
       newdata<-newdata[,variables_formula]
-      if(nrow(newdata)>1){
-        .x_bis <- model.matrix(object$formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),-1]
-      }else{
-        .x_bis <- model.matrix(object$formula, rbind(newdata,object$data[,names(newdata)]))[1,-1]
-      }
+      .x_bis <- model.matrix(object$formula, rbind(newdata, object$data[, names(newdata)]))[1:nrow(newdata), -1, drop=FALSE]
       .lp_bis <-predict(object$model, newx = .x_bis)
       .b <- glmnet_basesurv(object$data[[.times]], object$data[[.failures]], .lp, centered = FALSE)
       .H0 <- data.frame(value = .b$cumulative_base_hazard, time = .b$times)
@@ -157,7 +156,7 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
     }
 
     if(object$library=="LIB_PLANN"){
-  
+
       formula<-object$formula
       .times <- all.vars(formula)[1]
       .failures <- all.vars(formula)[2]
@@ -167,12 +166,9 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
         newdata<-cbind(new,newdata)
       }
       newdata<-newdata[,variables_formula]
-      if(nrow(newdata)>1){
-        data <- model.matrix(formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),]
-      }
-      else{
-        data <- model.matrix(formula, rbind(newdata,object$data[,names(newdata)]))[1,]
-      }
+      data <- model.matrix(formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),
+                                                                                  ,
+                                                                                  drop = FALSE]
       .time<-object$times[-1]
       .survivals <- as.matrix((predict(object$model, newdata = as.data.frame(data), newtimes=.time))$predictions)[,-1]
 
@@ -217,6 +213,7 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
       .surv <- t(.sumcoxphsurv$surv)
       .time<-newtimes
       .idx=findInterval(.time,object$times)
+      .idx[.time > max(object$times)] <- NA
       if(nrow(.surv)==1){
         .survivals<-.surv[.idx]
       }
@@ -239,17 +236,14 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
         newdata<-cbind(new,newdata)
       }
       newdata<-newdata[,variables_formula]
-      if(nrow(newdata)>1){
-        .x_bis <- model.matrix(object$formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),-1]
-      }else{
-        .x_bis <- model.matrix(object$formula, rbind(newdata,object$data[,names(newdata)]))[1,-1]
-      }
+      .x_bis <- model.matrix(object$formula, rbind(newdata, object$data[, names(newdata)]))[1:nrow(newdata), -1, drop=FALSE]
       .lp_bis <-predict(object$model, newx = .x_bis)
       .b <- glmnet_basesurv(object$data[[.times]], object$data[[.failures]], .lp, centered = FALSE)
       .H0 <- data.frame(value = c(0,.b$cumulative_base_hazard), time = c(0,.b$times))
       .surv <- exp(matrix(exp(.lp_bis)) %*% t(as.matrix(-1*.H0$value)))
       .time<-newtimes
       .idx<-findInterval(.time,.H0$time)
+      .idx[.time > max(.H0$time)] <- NA
       if(nrow(.surv)==1){
         .survivals<-.surv[.idx]
       }else{
@@ -266,6 +260,7 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
       .time.interest <- c(0, .pred.rf$time.interest)
       .time<-newtimes
       .idx=findInterval(.time,.time.interest)
+      .idx[.time > max(.time.interest)] <- NA
       .survivals<-.surv[,.idx]
 
     }
@@ -281,13 +276,9 @@ predict.libsl <- function(object, newdata=NULL, newtimes=NULL, ...){
         newdata<-cbind(new,newdata)
       }
       newdata<-newdata[,variables_formula]
-      if(nrow(newdata)>1){
-        data <- model.matrix(formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),]
-      }
-      else{
-        data <- model.matrix(formula, rbind(newdata,object$data[,names(newdata)]))[1,]
-      }
-
+      data <- model.matrix(formula,rbind(newdata,object$data[,names(newdata)]))[1:nrow(newdata),
+                                                                                  ,
+                                                                                  drop = FALSE]
       .time<-newtimes
       if(0 %in% .time){
         .survivals <- as.matrix(predict(object$model, newdata = as.data.frame(data), newtimes = .time)$prediction)

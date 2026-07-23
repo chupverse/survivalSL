@@ -1,8 +1,9 @@
 \name{summary.libsl}
 \alias{summary.libsl}
+\alias{print.summary.libsl}
 
 \title{
-Summaries of a Learner
+S3 method for Summarizing a Learner
 }
 \description{
 Return predictive performances of a model or algorithm obtained by a library  of the class \code{libsl}.
@@ -25,10 +26,11 @@ Return predictive performances of a model or algorithm obtained by a library  of
 
 
 \value{
-\item{metrics}{A data frame containing the computed predictive performance metrics.}
 \item{library}{The name of the library used for model training.}
 \item{pro.time}{The prognostic time used for evaluation.}
 \item{ROC.precision}{The precision values used for the ROC curve computation.}
+\item{metrics}{A data frame containing the computed predictive performance metrics.}
+
 }
 
 
