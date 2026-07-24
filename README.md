@@ -62,12 +62,12 @@ slres <- survivalSL(formula=formula,
 # prognostic capacities from training sample
 summary(slres, digits=3) 
 #>     p_ci  uno_ci   auc   bs   ibs  ribs   bll  ibll ribll        ll
-#>     0.677  0.677 0.719 0.202 0.09 0.095 0.594 0.286 0.314 -1084.344
+#>     0.677  0.677 0.719 0.202 0.09 0.095 0.594 0.287 0.314 -1084.348
 
 # prognostic capacities from validation sample
 summary(slres, newdata=data.simul[[2]], digits=3) 
 #>  p_ci uno_ci   auc    bs   ibs  ribs   bll  ibll ribll       ll
-#>  0.725  0.728 0.786 0.183 0.085 0.087 0.547 0.274  0.29 -476.942
+#>  0.725  0.728 0.786 0.183 0.085 0.087 0.547 0.274  0.29 -476.946
 ```
 
 ## Installation
@@ -81,10 +81,10 @@ install.packages("survivalSL")
 To install the development version from GitHub:
 
 ``` r
-remotes::install_github("foucher-y/survivalSL")
+remotes::install_github("chupverse/survivalSL")
 ```
 
 ## Reporting bugs
 
 You can report any issues at this
-[link](https://github.com/foucher-y/survivalSL/issues).
+[link](https://github.com/chupverse/survivalSL/issues).
