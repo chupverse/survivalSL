@@ -49,26 +49,27 @@ LIB_COXen <- function(formula,
 
   .y <- Surv(data[[times]], data[[failures]])
   .x <- model.matrix(formula,data)[,-1]
-  
-  
+
+
   if(!(is.null(penalty))){
-    
+
     if(length(penalty)!=length(variables_formula[-c(1,2)]))stop("Penalty length does not equal the number of variables.")
     if(!all(unique(penalty) %in% c(0,1)))stop("Penalty must be numeric and have only 0 or 1.")}
 
-  
+
   if(!(is.null(penalty))) {
     # .penalty.factor <- rep(1,length(colnames(.x)))
     # .penalty.factor[which(colnames(.x) %in% var)] <- 0
     .en <- glmnet(x = .x, y = .y, lambda = lambda,
                   type.measure = "deviance", family = "cox",
+                  cox.ties = "breslow",
                   alpha = alpha,penalty.factor = penalty)
 
   }
 
   else {
     .en<- glmnet(x = .x, y = .y, lambda = lambda,
-                 type.measure = "deviance", family = "cox",
+                 type.measure = "deviance", family = "cox", cox.ties = "breslow",
                  alpha = alpha)
 
   }

@@ -68,3 +68,6 @@ S3method(plot, sltime)
 
 S3method(print, libsl)
 S3method(print, sltime)
+
+S3method(print, summary.libsl)
+S3method(print, summary.sltime)

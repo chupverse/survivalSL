@@ -136,6 +136,7 @@ tuneCOXridge <- function(formula, data, penalty = NULL, cv = 10, parallel =
       x = .x,
       y = .y,
       family = "cox",
+      cox.ties = "breslow",
       type.measure = "deviance",
       nfolds = cv,
       parallel = parallel,
@@ -145,7 +146,7 @@ tuneCOXridge <- function(formula, data, penalty = NULL, cv = 10, parallel =
       penalty.factor = penalty,
       lambda = lambda
     )} else{
-    .cv.ridge <- cv.glmnet(x=.x, y=.y, family = "cox",  type.measure = "deviance",
+    .cv.ridge <- cv.glmnet(x=.x, y=.y, family = "cox",cox.ties = "breslow",  type.measure = "deviance",
                            nfolds = cv, parallel = parallel, alpha=0,keep=F, foldid = foldid,
                            lambda=lambda
     )

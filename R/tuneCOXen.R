@@ -134,7 +134,7 @@ tuneCOXen<- function(formula, data, penalty = NULL, cv = 10, parallel =
 
   if(!(is.null(penalty))) {
     for( a in 1:length(alpha)){
-      .cv.en<-glmnet::cv.glmnet(x=.x, y=.y, family = "cox",  type.measure = "deviance", foldid=foldid,
+      .cv.en<-glmnet::cv.glmnet(x=.x, y=.y, family = "cox",cox.ties = "breslow",  type.measure = "deviance", foldid=foldid,
                                 foldsid="folds", parallel = parallel, alpha=alpha[a],
                                 penalty.factor = penalty,
                                 lambda=lambda)
@@ -144,7 +144,7 @@ tuneCOXen<- function(formula, data, penalty = NULL, cv = 10, parallel =
     }
   }else{
     for(a in 1:length(alpha)){
-      .cv.en<-glmnet::cv.glmnet(x=.x, y=.y, family = "cox",  type.measure = "deviance", foldid=foldid,
+      .cv.en<-glmnet::cv.glmnet(x=.x, y=.y, family = "cox",cox.ties = "breslow",  type.measure = "deviance", foldid=foldid,
                                 foldsid="folds", parallel = parallel, alpha=alpha[a],
                                 lambda=lambda)
       .results<-rbind(.results,

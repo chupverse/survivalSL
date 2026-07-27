@@ -35,17 +35,17 @@ metrics <- function(metric, formula=NULL, data=NULL, survivals.matrix=NULL, haza
     if (is.null(formula)){formula<-object$formula}
   }
 
-
-  # We need a pro.time for certain metrics, so we take the median time
-  if(is.null(pro.time) & !(metric %in% c("ll","ibll","ibs"))) {pro.time <- median(data[[times]])}
-
-
   # We retrieve the names of the variables that interest us:
 
   variables_formula <- all.vars(formula)
 
   times <- variables_formula[1]
   failures <- variables_formula[2]
+
+
+  # We need a pro.time for certain metrics, so we take the median time
+  if(is.null(pro.time) & !(metric %in% c("ll","ibll","ibs"))) {pro.time <- median(data[[times]])}
+
 
   # The metric must be one of the following:
 
