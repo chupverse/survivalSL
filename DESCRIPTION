@@ -1,7 +1,7 @@
 Package: survivalSL
 Type: Package
 Title: Super Learner for Survival Prediction from Censored Data
-Version: 1.0
+Version: 1.01
 Depends: R (>= 4.0.0), splines, survival
 Imports: date, graphics, MASS, glmnet, caret,
          flexsurv, randomForestSRC, hdnom,  survivalPLANN,

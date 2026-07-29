@@ -49,11 +49,11 @@ Biganzoli E, Boracchi P, Mariani L, and et al. Feed forward neural networks for 
 \examples{
 data("dataDIVAT2")
 
-formula<-Surv(times,failures) ~ age + hla + retransplant + ecd
-tune.model <- tunePLANN(formula=formula, data=dataDIVAT2[1:150,],
+formula<-Surv(times,failures) ~ age + retransplant + ecd
+tune.model <- tunePLANN(formula=formula, data=dataDIVAT2[1:125,],
 cv=5, inter=c(2,1), size=c(16,32), decay=0.01, maxit=100, MaxNWts=1000,
 maxtime=NULL,seed=123,metric="auc",
-pro.time=NULL,ROC.precision=seq(.01, .99, by=.01))
+pro.time=NULL,ROC.precision=seq(.05, .95, by=.05))
 
 tune.model$optimal # the optimal hyperparameters
 

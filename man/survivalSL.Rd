@@ -99,15 +99,15 @@ Polley E and van der Laanet M. Super Learner In Prediction. http://biostats.bepr
 \examples{
 data("dataDIVAT2")
 
-# The Super Learner based from the first 200 individuals of the data base
+# The Super Learner based from the first 125 individuals of the data base
 
-formula<-Surv(times,failures) ~ age + hla + retransplant + ecd
+formula<-Surv(times,failures) ~ age + retransplant + ecd
 
-sl1 <- survivalSL(formula=formula, data=dataDIVAT2[1:200,],
+sl1 <- survivalSL(formula=formula, data=dataDIVAT2[1:125,],
                   methods=c("LIB_AFTgamma", "LIB_PHgompertz"))
 
 # Individual prediction
-pred <- predict(sl1, newdata=data.frame(age=c(52,52), hla=c(0,1),
+pred <- predict(sl1, newdata=data.frame(age=c(52,52),
 retransplant=c(1,1), ecd=c(0,1)))
 
 plot(y=pred$predictions$sl[1,], x=pred$times, xlab="Time (years)",

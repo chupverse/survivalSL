@@ -6,7 +6,7 @@ print.summary.libsl <- function(x, digits = max(4, getOption("digits") - 3), ...
   cat("\nSuper Learner Survival Model Summary")
   cat("\n====================================\n")
   
-  # Informations sur le modèle
+  # Informations sur le modele
   cat("\nModel Information:")
   cat("\n------------------")
   cat("\n  Library:", x$library)
@@ -19,7 +19,7 @@ print.summary.libsl <- function(x, digits = max(4, getOption("digits") - 3), ...
   cat("\n\nPerformance Metrics:")
   cat("\n--------------------\n")
   
-  # Formatage du tableau des métriques
+  # Formatage du tableau des metriques
   metrics_df <- x$metrics
   
   # Afficher le tableau
