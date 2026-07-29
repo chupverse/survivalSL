@@ -42,13 +42,13 @@ Royston, P. and Parmar, M. (2002). Flexible parametric proportional-hazards and 
 \examples{
 data("dataDIVAT2")
 
-# The estimation of the hyperparameters on the first 150 patients
+# The estimation of the hyperparameters on the first 100 patients
 
-formula<-Surv(times,failures) ~ age + hla + retransplant + ecd
+formula<-Surv(times,failures) ~ age + hla + retransplant
 tune.model <- tunePHspline(formula=formula,
-data=dataDIVAT2[1:150,], cv=3, metric="auc",
+data=dataDIVAT2[1:100,], cv=3, metric="auc",
 k=1:2, pro.time=NULL,seed=123,
-ROC.precision=seq(.01, .99, by=.02))
+ROC.precision=seq(.05, .95, by=.05))
 
 # the estimated nodesize value
 

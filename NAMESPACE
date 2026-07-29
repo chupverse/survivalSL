@@ -1,7 +1,6 @@
 import(splines)
 import(survival)
 import(survivalPLANN)
-#import(RISCA)
 
 importFrom(stats, terms, pnorm, dnorm, qnorm, update, binomial, lm, glm, na.omit, predict, quantile,
            sd, optim, pchisq, update.formula, coef, setNames, as.formula, model.matrix,
@@ -56,7 +55,7 @@ export(tunePLANN)
 
 export(metrics)
 
-# Export des méthodes S3 (une seule syntaxe - recommandé: S3method)
+
 S3method(predict, libsl)
 S3method(predict, sltime)
 
